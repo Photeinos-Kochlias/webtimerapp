@@ -1,0 +1,11 @@
+# Next.js
+.next/
+out/
+node_modules/
+npm-debug.log*
+
+# misc
+.DS_Store
+*.pem
+.env*
+!.env.example
