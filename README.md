@@ -1,49 +1,48 @@
-# Web Timer
+# webtimerapp
 
-タイマー・ストップウォッチ・ポモドーロタイマーのNext.jsアプリ。
+A simple and easy-to-use timer application.
+Just set the time and press the button. That’s it.
 
-## セットアップ
+## Features
 
-```bash
-npm install
-npm run dev
-```
+* Simple UI with minimal controls
+* Customizable timer duration
+* Sound feedback when the timer ends
+* Automatic start for the next session (Pomodoro-style)
 
-## GitHub Pagesへのデプロイ
+## Usage
 
-### 1. リポジトリの設定
+1. Set the desired time (hours, minutes, seconds)
+2. Press the start button
+3. Wait for the timer to finish
 
-GitHubリポジトリの **Settings → Pages** を開き:
-- **Source** を `GitHub Actions` に設定
+## Changelog
 
-### 2. プッシュ
+### Ver 1.1.1 (2026/6/15 10:10 JST)
 
-`main` ブランチにプッシュすると自動でビルド・デプロイされます。
+* Removed the maximum value limit for the hour input field
+* Fixed minor bugs
 
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/<your-username>/<repo-name>.git
-git push -u origin main
-```
+### Ver 1.1.0 (2026/6/14 18:08 JST)
 
-### 3. サブパスでの公開（リポジトリ名がある場合）
+* Added sound feedback
+* Enabled automatic start for the next Pomodoro step
+* Updated URL
 
-`next.config.js` に `basePath` を追加してください:
+### Ver 2.0.0 (2026/6/18 21:19 JST)
 
-```js
-const nextConfig = {
-  output: 'export',
-  trailingSlash: true,
-  basePath: '/<repo-name>',   // ← 追加
-  images: { unoptimized: true },
-}
-```
+*Changed language from html to Next.js
+
+
+## Notes
+
+* Designed for simplicity
+* Behavior may vary depending on environment
+
 
 ## 技術スタック
 
 - **Next.js 15** (App Router, Static Export)
 - **TypeScript**
-- **Web Audio API** (効果音)
-- CSS変数によるテーマ管理
+- **Web Audio API** (sound effect)
+- **Theme administration with global CSS**
