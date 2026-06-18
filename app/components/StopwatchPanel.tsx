@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import useWakeLock from '../hooks/useWakeLock'
 
 const CIRC = 603
 
@@ -47,6 +48,8 @@ export default function StopwatchPanel() {
     prevRef.current = cur
     setLaps(prev => [...prev, { split, total: cur }])
   }, [])
+
+  useWakeLock(running)
 
   useEffect(() => () => stop(), [stop])
 

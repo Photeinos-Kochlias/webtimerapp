@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import useWakeLock from '../hooks/useWakeLock'
 
 const CIRC = 603
 
@@ -96,6 +97,8 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
       return newLaps
     })
   }, [running, total])
+
+  useWakeLock(running)
 
   useEffect(() => () => stop(), [stop])
 

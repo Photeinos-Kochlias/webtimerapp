@@ -25,6 +25,21 @@
   --radius-sm: 10px;
 }
 
+/* Light theme overrides (applied when documentElement has data-theme="light") */
+[data-theme="light"] {
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface2: #f8f9fd;
+  --border: rgba(10, 10, 14, 0.06);
+  --border2: rgba(10, 10, 14, 0.09);
+  --text: #0b0b10;
+  --muted: rgba(11, 11, 16, 0.45);
+  --muted2: rgba(11, 11, 16, 0.7);
+  --accent: #7c6bff;
+  --accent2: #4fc4a0;
+  --amber: #f0a050;
+  --red: #ff5f5f;
+}
 html {
   height: 100%;
   -webkit-tap-highlight-color: transparent;

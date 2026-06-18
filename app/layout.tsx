@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import ThemeProvider from './components/ThemeProvider'
+import ThemeToggle from './components/ThemeToggle'
 
 export const metadata: Metadata = {
   title: 'Web Timer',
@@ -25,7 +27,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
-      <body>{children}</body>
+      <body>
+        <ThemeProvider>
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', padding: '12px 20px 0' }}>
+            <ThemeToggle />
+          </div>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   )
 }
