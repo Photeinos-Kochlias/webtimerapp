@@ -2,7 +2,6 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import useWakeLock from '../hooks/useWakeLock'
-import { useLocale } from '../hooks/useLocale'
 
 const CIRC = 603
 
@@ -20,7 +19,6 @@ interface Props {
 }
 
 export default function PomodoroPanel({ onBeep, onToast }: Props) {
-  const { messages } = useLocale()
   const [workMin, setWorkMin] = useState(25)
   const [shortMin, setShortMin] = useState(5)
   const [longMin, setLongMin] = useState(15)
@@ -57,13 +55,9 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
 
   const sessionLabel = (p: Phase, c: number, s: number) => {
     const wCount = Math.floor(c / 2) + 1
-    if (p === 'work') {
-      return messages.pomo.session
-        .replace('{current}', String(Math.min(wCount, s)))
-        .replace('{total}', String(s))
-    }
-    if (p === 'short') return messages.pomo.short
-    return messages.pomo.long
+    if (p === 'work') return `セッション ${Math.min(wCount, s)} / ${s}`
+    if (p === 'short') return '短い休憩'
+    return '長い休憩'
   }
 
   const nextPhase = useCallback((prevCur: number, prevPhase: Phase, autoStart: boolean,
@@ -73,7 +67,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
 
     if (wDone >= s && nextCur % 2 === 0) {
       onBeep('finish')
-      onToast(messages.pomo.finished, '#4fc4a0')
+      onToast('🎉 全セット完了！お疲れさまでした！', '#4fc4a0')
       // reset
       setCur(0); setPhase('work')
       const t = w * 60; setTotal(t); setLeft(t)
@@ -99,9 +93,9 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
             stop()
             const st = stateRef.current
             if (st.phase === 'work') {
-              onBeep('done'); onToast(messages.pomo.workEnd, '#7c6bff')
+              onBeep('done'); onToast('⏰ 作業終了！休憩へ移ります', '#7c6bff')
             } else {
-              onBeep('break'); onToast(messages.pomo.breakEnd, '#4fc4a0')
+              onBeep('break'); onToast('🌿 休憩終了！作業を再開します', '#4fc4a0')
             }
             setTimeout(() => {
               const st2 = stateRef.current
@@ -121,10 +115,10 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
         stop()
         const st = stateRef.current
         if (st.phase === 'work') {
-          onBeep('done'); onToast(messages.pomo.workEnd, '#7c6bff')
-        } else {
-          onBeep('break'); onToast(messages.pomo.breakEnd, '#4fc4a0')
-        }
+            onBeep('done'); onToast('⏰ 作業終了！休憩へ移ります', '#7c6bff')
+          } else {
+            onBeep('break'); onToast('🌿 休憩終了！作業を再開します', '#4fc4a0')
+          }
         setTimeout(() => {
           const st2 = stateRef.current
           nextPhase(st2.cur, st2.phase, true, st2.workMin, st2.shortMin, st2.longMin, st2.sets)
@@ -133,7 +127,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
       }
       return prev - 1
     })
-  }, [stop, onBeep, onToast, nextPhase, messages.pomo.workEnd, messages.pomo.breakEnd])
+  }, [stop, onBeep, onToast, nextPhase])
 
   const toggle = useCallback(() => {
     if (running) {
@@ -186,7 +180,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
   }
 
   const badgeClass = phase === 'work' ? 'work' : phase === 'short' ? 'short' : 'long'
-  const badgeTxt = phase === 'work' ? messages.pomo.work : phase === 'short' ? messages.pomo.short : messages.pomo.long
+  const badgeTxt = phase === 'work' ? '作業中' : phase === 'short' ? '短い休憩' : '長い休憩'
 
   return (
     <div className="card">
@@ -214,7 +208,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
       </div>
 
       <div className="btns">
-        <button className="btn btn-icon" onClick={reset} title={messages.pomo.reset}>
+        <button className="btn btn-icon" onClick={reset} title="リセット">
           <svg className="ico" viewBox="0 0 24 24">
             <polyline points="1 4 1 10 7 10" />
             <path d="M3.51 15a9 9 0 1 0 .49-3.14" />
@@ -225,9 +219,9 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
             ? <svg className="ico" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
             : <svg className="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" /></svg>
           }
-          <span>{running ? messages.pomo.pause : messages.pomo.start}</span>
+          <span>{running ? '一時停止' : 'スタート'}</span>
         </button>
-        <button className="btn btn-icon" onClick={skip} title={messages.pomo.skip}>
+        <button className="btn btn-icon" onClick={skip} title="スキップ">
           <svg className="ico" viewBox="0 0 24 24">
             <polygon points="5 4 15 12 5 20 5 4" />
             <line x1="19" y1="5" x2="19" y2="19" />
@@ -239,33 +233,33 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
 
       <div className="pomo-settings">
         <div className="ps-cell">
-          <label>{messages.pomo.workMinutes}</label>
+          <label>作業（分）</label>
           <input type="number" min={1} max={60} value={wInput}
             onChange={e => setWInput(parseInt(e.target.value) || 25)} />
         </div>
         <div className="ps-cell">
-          <label>{messages.pomo.shortMinutes}</label>
+          <label>短い休憩（分）</label>
           <input type="number" min={1} max={30} value={sInput}
             onChange={e => setSInput(parseInt(e.target.value) || 5)} />
         </div>
         <div className="ps-cell">
-          <label>{messages.pomo.longMinutes}</label>
+          <label>長い休憩（分）</label>
           <input type="number" min={1} max={60} value={lInput}
             onChange={e => setLInput(parseInt(e.target.value) || 15)} />
         </div>
         <div className="ps-cell">
-          <label>{messages.pomo.sets}</label>
+          <label>セット数</label>
           <input type="number" min={1} max={10} value={nInput}
             onChange={e => setNInput(parseInt(e.target.value) || 4)} />
         </div>
         <div className="ps-cell full">
           <div className="apply-row">
-            <span className="apply-hint">{messages.pomo.applyHint}</span>
+            <span className="apply-hint">変更後に適用してください</span>
             <button className="btn" style={{ height: 36, fontSize: 12 }} onClick={apply}>
               <svg className="ico" viewBox="0 0 24 24">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              {messages.pomo.apply}
+              適用
             </button>
           </div>
         </div>

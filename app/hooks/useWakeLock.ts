@@ -14,9 +14,12 @@ export default function useWakeLock(active: boolean) {
     if (!('wakeLock' in navigator)) return
     try {
       wakeLockRef.current = await (navigator as any).wakeLock.request('screen')
-      wakeLockRef.current.addEventListener('release', () => {
-        wakeLockRef.current = null
-      })
+      const sentinel = wakeLockRef.current
+      if (sentinel) {
+        sentinel.addEventListener('release', () => {
+          wakeLockRef.current = null
+        })
+      }
     } catch {
       // ignore wake lock failures
     }
