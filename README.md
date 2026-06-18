@@ -18,6 +18,10 @@ Just set the time and press the button. That’s it.
 
 ## Changelog
 
+### Ver 2.0.0 (2026/6/18 21:19 JST)
+
+*Changed language from html to Next.js
+
 ### Ver 1.1.1 (2026/6/15 10:10 JST)
 
 * Removed the maximum value limit for the hour input field
@@ -28,10 +32,6 @@ Just set the time and press the button. That’s it.
 * Added sound feedback
 * Enabled automatic start for the next Pomodoro step
 * Updated URL
-
-### Ver 2.0.0 (2026/6/18 21:19 JST)
-
-*Changed language from html to Next.js
 
 
 ## Notes
