@@ -18,9 +18,20 @@ Just set the time and press the button. That’s it.
 
 ## Changelog
 
+### Ver 2.2.0 (2026/6/1 22:43 JST)
+
+* The timer text automatically adjusts its size to always fit within the circular ring, even when displaying longer durations (e.g., over 1 hour).
+* The timer continues seamlessly even if the app is closed. Progress is restored based on the elapsed time when the app is reopened.
+* Users can save custom timer and Pomodoro presets for quick reuse.
+* Each preset can include: Name, Description, Labels (for categorization and organization)
+
+### Ver 2.1.0 (2026/6/18 23:19 JST)
+
+* Added button to switch dark-mode and light-mode
+
 ### Ver 2.0.0 (2026/6/18 21:19 JST)
 
-*Changed language from html to Next.js
+* Changed language from html to Next.js
 
 ### Ver 1.1.1 (2026/6/15 10:10 JST)
 
