@@ -175,15 +175,20 @@ body::before {
   justify-content: center;
   gap: 4px;
   z-index: 1;
+  width: min(100%, 180px);
+  padding: 0 10px;
 }
 
 .time-num {
   font-family: var(--mono);
-  font-size: 52px;
+  font-size: clamp(28px, 6vw, 52px);
   font-weight: 300;
   letter-spacing: -0.02em;
   color: var(--text);
   line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .time-ms {

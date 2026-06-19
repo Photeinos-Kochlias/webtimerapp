@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import useWakeLock from '../hooks/useWakeLock'
+import { saveState, loadState, now } from '../utils/persist'
 
 const CIRC = 603
 
@@ -16,10 +17,12 @@ interface Lap { split: number; total: number }
 export default function StopwatchPanel() {
   const [ms, setMs] = useState(0)
   const [running, setRunning] = useState(false)
+  const [started, setStarted] = useState(false)
   const [laps, setLaps] = useState<Lap[]>([])
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const msRef = useRef(0)
   const prevRef = useRef(0)
+  const startAtRef = useRef<number | null>(null)
 
   msRef.current = ms
 
@@ -27,19 +30,32 @@ export default function StopwatchPanel() {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
   }, [])
 
+  const saveSw = useCallback(() => {
+    try {
+      saveState('sw', { running, ms: msRef.current, startedAt: startAtRef.current })
+    } catch {}
+  }, [running])
+
   const toggle = useCallback(() => {
     if (running) {
       stop(); setRunning(false)
+      startAtRef.current = null
+      saveSw()
     } else {
       setRunning(true)
+      setStarted(true)
+      startAtRef.current = Date.now()
+      saveSw()
       intervalRef.current = setInterval(() => setMs(prev => prev + 1), 10)
     }
   }, [running, stop])
 
   const reset = useCallback(() => {
-    stop(); setRunning(false)
+    stop(); setRunning(false); setStarted(false)
     setMs(0); msRef.current = 0; prevRef.current = 0
     setLaps([])
+    startAtRef.current = null
+    saveSw()
   }, [stop])
 
   const lap = useCallback(() => {
@@ -52,6 +68,26 @@ export default function StopwatchPanel() {
   useWakeLock(running)
 
   useEffect(() => () => stop(), [stop])
+
+  useEffect(() => {
+    const st = loadState<any>('sw')
+    if (!st) return
+    const savedMs = st.ms ?? 0
+    if (st.running && st.startedAt) {
+      const delta = Date.now() - st.startedAt
+      const restored = Math.floor(savedMs + delta / 10)
+      setMs(restored)
+      msRef.current = restored
+      startAtRef.current = st.startedAt
+      setRunning(true)
+      setStarted(true)
+      intervalRef.current = setInterval(() => setMs(prev => prev + 1), 10)
+    } else {
+      setMs(savedMs)
+      msRef.current = savedMs
+      setRunning(false)
+    }
+  }, [])
 
   const secs = Math.floor(ms / 100)
   const centis = ms % 100
@@ -92,7 +128,7 @@ export default function StopwatchPanel() {
             ? <svg className="ico" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
             : <svg className="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" /></svg>
           }
-          <span>{running ? '一時停止' : 'スタート'}</span>
+          <span>{running ? '一時停止' : started ? '再開' : 'スタート'}</span>
         </button>
         <button className="btn btn-icon" onClick={lap} disabled={!running} title="ラップ">
           <svg className="ico" viewBox="0 0 24 24">

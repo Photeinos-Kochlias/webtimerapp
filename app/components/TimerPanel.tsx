@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { saveState, loadState, now } from '../utils/persist'
 import useWakeLock from '../hooks/useWakeLock'
 
 const CIRC = 603
@@ -28,6 +29,22 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
   const [label, setLabel] = useState('準備中')
   const [laps, setLaps] = useState<Lap[]>([])
 
+  const normalizeNumber = useCallback((value: string, min: number, max = Number.POSITIVE_INFINITY) => {
+    const num = Number(value)
+    if (!Number.isFinite(num)) return min
+    return Math.min(max, Math.max(min, Math.trunc(num)))
+  }, [])
+
+  const syncTimerDisplay = useCallback((nextH: number, nextM: number, nextS: number) => {
+    const nextTotal = nextH * 3600 + nextM * 60 + nextS
+    if (!running) {
+      setLeft(nextTotal)
+      setTotal(nextTotal)
+      leftRef.current = nextTotal
+      prevLeftRef.current = null
+    }
+  }, [running])
+
   const prevLeftRef = useRef<number | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const leftRef = useRef(left)
@@ -43,11 +60,26 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
   }, [])
 
+  const saveTimer = useCallback((extra: any = {}) => {
+    try {
+      const payload = {
+        running,
+        left: leftRef.current,
+        total,
+        prevLeft: prevLeftRef.current,
+        ts: now(),
+        ...extra,
+      }
+      saveState('timer', payload)
+    } catch {}
+  }, [running, total])
+
   const toggle = useCallback(() => {
     if (running) {
       stop()
       setRunning(false)
       setLabel('一時停止中')
+      saveTimer({ running: false })
     } else {
       if (leftRef.current === 0) return
       if (prevLeftRef.current === null) {
@@ -59,6 +91,7 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
       }
       prevLeftRef.current = leftRef.current
       setRunning(true)
+      saveTimer({ running: true, endTs: Date.now() + leftRef.current * 1000 })
       setLabel('カウントダウン中')
       intervalRef.current = setInterval(() => {
         setLeft(prev => {
@@ -69,8 +102,10 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
             setLabel('完了！')
             onBeep('done')
             onToast('⏰ 時間です！', '#7c6bff')
+            saveTimer({ running: false, left: 0 })
             return 0
           }
+          saveTimer({ left: next })
           return next
         })
       }, 1000)
@@ -80,12 +115,14 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
   const reset = useCallback(() => {
     stop()
     prevLeftRef.current = null
-    const t = getSecs() || 300
+    const t = getSecs()
     setTotal(t)
     setLeft(t)
+    leftRef.current = t
     setRunning(false)
     setLabel('準備中')
     setLaps([])
+    saveState('timer', { running: false, left: t, total: t, prevLeft: null })
   }, [stop, getSecs])
 
   const lap = useCallback(() => {
@@ -101,6 +138,42 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
   useWakeLock(running)
 
   useEffect(() => () => stop(), [stop])
+
+  useEffect(() => {
+    const st = loadState<any>('timer')
+    if (!st) return
+    if (st.running && st.endTs) {
+      const remaining = Math.max(0, Math.ceil((st.endTs - Date.now()) / 1000))
+      setTotal(st.total ?? remaining)
+      setLeft(remaining)
+      leftRef.current = remaining
+      prevLeftRef.current = st.prevLeft ?? null
+      if (remaining > 0) {
+        setRunning(true)
+        setLabel('カウントダウン中')
+        intervalRef.current = setInterval(() => {
+          setLeft(prev => {
+            const next = prev - 1
+            if (next <= 0) {
+              stop(); setRunning(false); setLabel('完了！')
+              saveState('timer', { running: false, left: 0 })
+              return 0
+            }
+            saveState('timer', { running: true, left: next, endTs: Date.now() + next * 1000 })
+            return next
+          })
+        }, 1000)
+      } else {
+        setLabel('完了！')
+      }
+    } else {
+      setLeft(st.left ?? left)
+      setTotal(st.total ?? total)
+      leftRef.current = st.left ?? left
+      prevLeftRef.current = st.prevLeft ?? null
+      setRunning(false)
+    }
+  }, [])
 
   const splits = laps.map(l => l.split)
   const best = splits.length ? Math.max(...splits) : -1
@@ -125,24 +198,53 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
         </div>
       </div>
 
-      {!running && (
+      {!running && prevLeftRef.current === null && (
         <div className="t-inputs">
           <div className="t-inp-cell">
             <label>時間</label>
-            <input type="number" min={0} value={hVal}
-              onChange={e => setHVal(Math.max(0, parseInt(e.target.value) || 0))} />
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={hVal}
+              onChange={e => {
+                const next = normalizeNumber(e.target.value, 0)
+                setHVal(next)
+                syncTimerDisplay(next, mVal, sVal)
+              }}
+            />
           </div>
           <span className="t-sep">:</span>
           <div className="t-inp-cell">
             <label>分</label>
-            <input type="number" min={0} max={59} value={mVal}
-              onChange={e => setMVal(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))} />
+            <input
+              type="number"
+              min={0}
+              max={59}
+              step={1}
+              value={mVal}
+              onChange={e => {
+                const next = normalizeNumber(e.target.value, 0, 59)
+                setMVal(next)
+                syncTimerDisplay(hVal, next, sVal)
+              }}
+            />
           </div>
           <span className="t-sep">:</span>
           <div className="t-inp-cell">
             <label>秒</label>
-            <input type="number" min={0} max={59} value={sVal}
-              onChange={e => setSVal(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))} />
+            <input
+              type="number"
+              min={0}
+              max={59}
+              step={1}
+              value={sVal}
+              onChange={e => {
+                const next = normalizeNumber(e.target.value, 0, 59)
+                setSVal(next)
+                syncTimerDisplay(hVal, mVal, next)
+              }}
+            />
           </div>
         </div>
       )}
@@ -160,7 +262,7 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
             ? <svg className="ico" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
             : <svg className="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" /></svg>
           }
-          <span>{running ? '一時停止' : 'スタート'}</span>
+          <span>{running ? '一時停止' : prevLeftRef.current !== null ? '再開' : 'スタート'}</span>
         </button>
         <button className="btn btn-icon" onClick={lap} disabled={!running} title="ラップ">
           <svg className="ico" viewBox="0 0 24 24">

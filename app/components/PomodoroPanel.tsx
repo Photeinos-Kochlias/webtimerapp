@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import useWakeLock from '../hooks/useWakeLock'
+import { saveState, loadState, now } from '../utils/persist'
 
 const CIRC = 603
 
@@ -35,6 +36,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
   const [left, setLeft] = useState(25 * 60)
   const [total, setTotal] = useState(25 * 60)
   const [running, setRunning] = useState(false)
+  const [started, setStarted] = useState(false)
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const stateRef = useRef({ cur, phase, left, total, running, workMin, shortMin, longMin, sets })
@@ -43,6 +45,12 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
   const stop = useCallback(() => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
   }, [])
+
+  const savePomo = useCallback((extra: any = {}) => {
+    try {
+      saveState('pomo', { cur, phase, left, total, running, started, ts: now(), ...extra })
+    } catch {}
+  }, [cur, phase, left, total, running, started])
 
   const phaseTime = useCallback((p: Phase, w: number, sh: number, lo: number) => {
     if (p === 'work') return w * 60
@@ -72,6 +80,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
       setCur(0); setPhase('work')
       const t = w * 60; setTotal(t); setLeft(t)
       setRunning(false)
+      setStarted(false)
       return
     }
 
@@ -132,8 +141,11 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
   const toggle = useCallback(() => {
     if (running) {
       stop(); setRunning(false)
+      savePomo({ running: false })
     } else {
       setRunning(true)
+      setStarted(true)
+      savePomo({ running: true, endTs: Date.now() + left * 1000 })
       intervalRef.current = setInterval(tick, 1000)
     }
   }, [running, stop, tick])
@@ -146,21 +158,103 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
   }, [stop, onBeep, nextPhase])
 
   const reset = useCallback(() => {
-    stop(); setRunning(false)
+    stop(); setRunning(false); setStarted(false)
     setCur(0); setPhase('work')
     const t = workMin * 60; setTotal(t); setLeft(t)
+    savePomo({ running: false, left: t, total: t, cur: 0, phase: 'work' })
   }, [stop, workMin])
 
   const apply = useCallback(() => {
-    stop(); setRunning(false)
+    stop(); setRunning(false); setStarted(false)
     setWorkMin(wInput); setShortMin(sInput); setLongMin(lInput); setSets(nInput)
     setCur(0); setPhase('work')
     const t = wInput * 60; setTotal(t); setLeft(t)
+    savePomo({ running: false, left: t, total: t, cur: 0, phase: 'work' })
   }, [stop, wInput, sInput, lInput, nInput])
 
   useWakeLock(running)
 
   useEffect(() => () => stop(), [stop])
+
+  useEffect(() => {
+    const st = loadState<any>('pomo')
+    if (!st) return
+    // restore basic values
+    let curVal = st.cur ?? 0
+    let phaseVal: Phase = st.phase ?? 'work'
+    setTotal(st.total ?? total)
+
+    if (st.running && st.endTs) {
+      // time passed since save
+      const elapsed = Math.max(0, Math.floor((Date.now() - (st.ts ?? Date.now())) / 1000))
+      let remaining = (st.left ?? 0) - elapsed
+
+      if (remaining > 0) {
+        setCur(curVal)
+        setPhase(phaseVal)
+        setLeft(remaining)
+        setRunning(true)
+        setStarted(true)
+        intervalRef.current = setInterval(tick, 1000)
+        return
+      }
+
+      // advance through phases using overflow seconds
+      let overflow = -remaining
+      // helper to compute next phase
+      const advanceOnce = (c: number) => {
+        const nextCur = c + 1
+        const wDone = Math.ceil(nextCur / 2)
+        if (wDone >= sets && nextCur % 2 === 0) return { finished: true as const }
+        const nextPhase = nextCur % 2 === 1 ? (wDone === sets ? 'long' : 'short') : 'work'
+        const dur = phaseTime(nextPhase as Phase, workMin, shortMin, longMin)
+        return { finished: false as const, nextCur, nextPhase: nextPhase as Phase, dur }
+      }
+
+      while (true) {
+        const res = advanceOnce(curVal)
+        if (res.finished) {
+          // all sets completed
+          setCur(0); setPhase('work')
+          const t = workMin * 60; setTotal(t); setLeft(t)
+          setRunning(false); setStarted(false)
+          return
+        }
+        if (overflow < res.dur) {
+          // we're inside this phase
+          setCur(res.nextCur)
+          setPhase(res.nextPhase)
+          setTotal(res.dur)
+          setLeft(res.dur - overflow)
+          setRunning(true)
+          setStarted(true)
+          intervalRef.current = setInterval(tick, 1000)
+          return
+        }
+        // consume this full phase and continue
+        overflow -= res.dur
+        curVal = res.nextCur
+      }
+    } else {
+      setCur(st.cur ?? 0)
+      setPhase(st.phase ?? 'work')
+      setLeft(st.left ?? left)
+      setRunning(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const saveNow = () => savePomo()
+    const onVisibility = () => { if (document.hidden) saveNow() }
+    window.addEventListener('pagehide', saveNow)
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('beforeunload', saveNow)
+    return () => {
+      window.removeEventListener('pagehide', saveNow)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('beforeunload', saveNow)
+    }
+  }, [savePomo])
 
   const ratio = total > 0 ? left / total : 0
   const dashOffset = CIRC - ratio * CIRC
@@ -219,7 +313,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
             ? <svg className="ico" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>
             : <svg className="ico" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3" /></svg>
           }
-          <span>{running ? '一時停止' : 'スタート'}</span>
+          <span>{running ? '一時停止' : started ? '再開' : 'スタート'}</span>
         </button>
         <button className="btn btn-icon" onClick={skip} title="スキップ">
           <svg className="ico" viewBox="0 0 24 24">

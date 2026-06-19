@@ -40,9 +40,15 @@ export default function Home() {
           ))}
         </div>
 
-        {tab === 'timer' && <TimerPanel onBeep={beep} onToast={toast} />}
-        {tab === 'sw' && <StopwatchPanel />}
-        {tab === 'pomo' && <PomodoroPanel onBeep={beep} onToast={toast} />}
+        <div style={{ display: tab === 'timer' ? 'block' : 'none' }}>
+          <TimerPanel onBeep={beep} onToast={toast} />
+        </div>
+        <div style={{ display: tab === 'sw' ? 'block' : 'none' }}>
+          <StopwatchPanel />
+        </div>
+        <div style={{ display: tab === 'pomo' ? 'block' : 'none' }}>
+          <PomodoroPanel onBeep={beep} onToast={toast} />
+        </div>
       </div>
     </>
   )
