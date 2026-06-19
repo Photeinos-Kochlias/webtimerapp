@@ -6,7 +6,7 @@ import { Preset, loadPresets, addPreset, deletePreset, updatePreset, getAllLabel
 interface PresetManagerProps {
   type: 'timer' | 'pomo'
   onLoad: (preset: Preset) => void
-  onSave: (config: any) => void
+  onSave: () => any
 }
 
 export default function PresetManager({ type, onLoad, onSave }: PresetManagerProps) {
