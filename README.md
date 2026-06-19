@@ -18,7 +18,7 @@ Just set the time and press the button. That’s it.
 
 ## Changelog
 
-### Ver 2.2.0 (2026/6/1 22:43 JST)
+### Ver 2.2.0 (2026/6/19 22:43 JST)
 
 * The timer text automatically adjusts its size to always fit within the circular ring, even when displaying longer durations (e.g., over 1 hour).
 * The timer continues seamlessly even if the app is closed. Progress is restored based on the elapsed time when the app is reopened.
