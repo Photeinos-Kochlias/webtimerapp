@@ -3,6 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import useWakeLock from '../hooks/useWakeLock'
 import { saveState, loadState, now } from '../utils/persist'
+import { Preset } from '../utils/presets'
+import PresetManager from './PresetManager'
 
 const CIRC = 603
 
@@ -177,6 +179,19 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
   useEffect(() => () => stop(), [stop])
 
   useEffect(() => {
+    const saveNow = () => savePomo()
+    const onVisibility = () => { if (document.hidden) saveNow() }
+    window.addEventListener('pagehide', saveNow)
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('beforeunload', saveNow)
+    return () => {
+      window.removeEventListener('pagehide', saveNow)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('beforeunload', saveNow)
+    }
+  }, [savePomo])
+
+  useEffect(() => {
     const st = loadState<any>('pomo')
     if (!st) return
     // restore basic values
@@ -242,19 +257,6 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
       setRunning(false)
     }
   }, [])
-
-  useEffect(() => {
-    const saveNow = () => savePomo()
-    const onVisibility = () => { if (document.hidden) saveNow() }
-    window.addEventListener('pagehide', saveNow)
-    document.addEventListener('visibilitychange', onVisibility)
-    window.addEventListener('beforeunload', saveNow)
-    return () => {
-      window.removeEventListener('pagehide', saveNow)
-      document.removeEventListener('visibilitychange', onVisibility)
-      window.removeEventListener('beforeunload', saveNow)
-    }
-  }, [savePomo])
 
   const ratio = total > 0 ? left / total : 0
   const dashOffset = CIRC - ratio * CIRC
@@ -358,6 +360,34 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
           </div>
         </div>
       </div>
+
+      <PresetManager
+        type="pomo"
+        onSave={() => ({ workMin, shortMin, longMin, sets })}
+        onLoad={(preset: Preset) => {
+          const config = preset.config as any
+          const w = config.workMin ?? 25
+          const sh = config.shortMin ?? 5
+          const lo = config.longMin ?? 15
+          const s = config.sets ?? 4
+          stop()
+          setRunning(false)
+          setStarted(false)
+          setWorkMin(w)
+          setShortMin(sh)
+          setLongMin(lo)
+          setSets(s)
+          setWInput(w)
+          setSInput(sh)
+          setLInput(lo)
+          setNInput(s)
+          setCur(0)
+          setPhase('work')
+          const t = w * 60
+          setTotal(t)
+          setLeft(t)
+        }}
+      />
     </div>
   )
 }

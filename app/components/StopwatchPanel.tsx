@@ -70,6 +70,19 @@ export default function StopwatchPanel() {
   useEffect(() => () => stop(), [stop])
 
   useEffect(() => {
+    const saveNow = () => saveSw()
+    const onVisibility = () => { if (document.hidden) saveNow() }
+    window.addEventListener('pagehide', saveNow)
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('beforeunload', saveNow)
+    return () => {
+      window.removeEventListener('pagehide', saveNow)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('beforeunload', saveNow)
+    }
+  }, [saveSw])
+
+  useEffect(() => {
     const st = loadState<any>('sw')
     if (!st) return
     const savedMs = st.ms ?? 0

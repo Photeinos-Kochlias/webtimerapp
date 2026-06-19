@@ -2,7 +2,9 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { saveState, loadState, now } from '../utils/persist'
+import { Preset, addPreset } from '../utils/presets'
 import useWakeLock from '../hooks/useWakeLock'
+import PresetManager from './PresetManager'
 
 const CIRC = 603
 
@@ -138,6 +140,19 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
   useWakeLock(running)
 
   useEffect(() => () => stop(), [stop])
+
+  useEffect(() => {
+    const saveNow = () => saveTimer()
+    const onVisibility = () => { if (document.hidden) saveNow() }
+    window.addEventListener('pagehide', saveNow)
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('beforeunload', saveNow)
+    return () => {
+      window.removeEventListener('pagehide', saveNow)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('beforeunload', saveNow)
+    }
+  }, [saveTimer])
 
   useEffect(() => {
     const st = loadState<any>('timer')
@@ -292,6 +307,18 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
           </div>
         </div>
       )}
+
+      <PresetManager
+        type="timer"
+        onSave={() => ({ hours: hVal, minutes: mVal, seconds: sVal })}
+        onLoad={(preset: Preset) => {
+          const config = preset.config as any
+          setHVal(config.hours ?? 0)
+          setMVal(config.minutes ?? 0)
+          setSVal(config.seconds ?? 0)
+          syncTimerDisplay(config.hours ?? 0, config.minutes ?? 0, config.seconds ?? 0)
+        }}
+      />
     </div>
   )
 }
