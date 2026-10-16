@@ -14,7 +14,7 @@ function fmtTimer(s: number) {
 
 interface Lap { split: number; total: number }
 
-export default function StopwatchPanel() {
+export default function StopwatchPanel({ isActive }: { isActive: boolean }) {
   const [ms, setMs] = useState(0)
   const [running, setRunning] = useState(false)
   const [started, setStarted] = useState(false)
@@ -49,6 +49,19 @@ export default function StopwatchPanel() {
       intervalRef.current = setInterval(() => setMs(prev => prev + 1), 10)
     }
   }, [running, stop])
+
+  useEffect(() => {
+    if (!isActive) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return
+      if (event.code !== 'Space' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return
+      event.preventDefault()
+      toggle()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isActive, toggle])
 
   const reset = useCallback(() => {
     stop(); setRunning(false); setStarted(false)

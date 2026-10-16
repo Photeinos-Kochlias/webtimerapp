@@ -47,13 +47,13 @@ export default function Home() {
         </div>
 
         <div style={{ display: tab === 'timer' ? 'block' : 'none' }}>
-          <TimerPanel onBeep={beep} onToast={toast} />
+          <TimerPanel isActive={tab === 'timer'} onBeep={beep} onToast={toast} />
         </div>
         <div style={{ display: tab === 'sw' ? 'block' : 'none' }}>
-          <StopwatchPanel />
+          <StopwatchPanel isActive={tab === 'sw'} />
         </div>
         <div style={{ display: tab === 'pomo' ? 'block' : 'none' }}>
-          <PomodoroPanel onBeep={beep} onToast={toast} />
+          <PomodoroPanel isActive={tab === 'pomo'} onBeep={beep} onToast={toast} />
         </div>
       </div>
     </>

@@ -17,11 +17,12 @@ function fmtTimer(s: number) {
 type Phase = 'work' | 'short' | 'long'
 
 interface Props {
+  isActive: boolean
   onBeep: (type: 'done' | 'break' | 'finish') => void
   onToast: (msg: string, color?: string) => void
 }
 
-export default function PomodoroPanel({ onBeep, onToast }: Props) {
+export default function PomodoroPanel({ isActive, onBeep, onToast }: Props) {
   const [workMin, setWorkMin] = useState(25)
   const [shortMin, setShortMin] = useState(5)
   const [longMin, setLongMin] = useState(15)
@@ -43,8 +44,8 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const endAtRef = useRef<number | null>(null)
-  const stateRef = useRef({ cur, phase, left, total, running, workMin, shortMin, longMin, sets })
-  stateRef.current = { cur, phase, left, total, running, workMin, shortMin, longMin, sets }
+  const stateRef = useRef({ cur, phase, left, total, running, started, workMin, shortMin, longMin, sets })
+  stateRef.current = { cur, phase, left, total, running, started, workMin, shortMin, longMin, sets }
 
   const stop = useCallback(() => {
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
@@ -165,6 +166,49 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
     if (st.phase === 'work') onBeep('done'); else onBeep('break')
     nextPhase(st.cur, st.phase, st.running, st.workMin, st.shortMin, st.longMin, st.sets)
   }, [stop, onBeep, nextPhase])
+
+  const previousPhase = useCallback(() => {
+    const st = stateRef.current
+    if (st.cur <= 0) return
+    stop()
+    endAtRef.current = null
+    const nextCur = st.cur - 1
+    const nextPhase: Phase = nextCur % 2 === 0 ? 'work' : nextCur === 2 * st.sets - 1 ? 'long' : 'short'
+    const nextTotal = phaseTime(nextPhase, st.workMin, st.shortMin, st.longMin)
+    const endTs = st.running ? Date.now() + nextTotal * 1000 : null
+    setCur(nextCur)
+    setPhase(nextPhase)
+    setTotal(nextTotal)
+    setLeft(nextTotal)
+    setRunning(st.running)
+    setStarted(st.started || st.running)
+    if (st.running) {
+      endAtRef.current = endTs
+      intervalRef.current = setInterval(tick, 1000)
+    }
+    savePomo({ cur: nextCur, phase: nextPhase, total: nextTotal, left: nextTotal, running: st.running, started: st.started || st.running, endTs })
+  }, [stop, phaseTime, tick, savePomo])
+
+  useEffect(() => {
+    if (!isActive) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return
+      if (event.code === 'Space') {
+        event.preventDefault()
+        toggle()
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        skip()
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        previousPhase()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isActive, toggle, skip, previousPhase])
 
   const reset = useCallback(() => {
     stop(); setRunning(false); setStarted(false)

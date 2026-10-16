@@ -17,11 +17,12 @@ function fmtTimer(s: number) {
 interface Lap { split: number; total: number }
 
 interface Props {
+  isActive: boolean
   onBeep: (type: 'done' | 'break' | 'finish') => void
   onToast: (msg: string, color?: string) => void
 }
 
-export default function TimerPanel({ onBeep, onToast }: Props) {
+export default function TimerPanel({ isActive, onBeep, onToast }: Props) {
   const [hVal, setHVal] = useState(0)
   const [mVal, setMVal] = useState(5)
   const [sVal, setSVal] = useState(0)
@@ -113,6 +114,19 @@ export default function TimerPanel({ onBeep, onToast }: Props) {
       }, 1000)
     }
   }, [running, stop, getSecs, onBeep, onToast])
+
+  useEffect(() => {
+    if (!isActive) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return
+      if (event.code !== 'Space' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return
+      event.preventDefault()
+      toggle()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isActive, toggle])
 
   const reset = useCallback(() => {
     stop()
