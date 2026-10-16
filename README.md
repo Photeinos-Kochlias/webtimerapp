@@ -17,7 +17,7 @@ Just set the time and press the button. That’s it.
 3. Wait for the timer to finish
 
 ## Changelog
-### Ver 2.2.2
+### Ver 2.2.2 (2026/10/16 20:06 JST)
 * Add fabicon.
 * Adopt latest Typescript.
 * Change the timing and criteria for checking input values.
