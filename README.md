@@ -17,11 +17,12 @@ Just set the time and press the button. That’s it.
 3. Wait for the timer to finish
 
 ## Changelog
-### Ver 2.2.2 (2026/10/16 20:06 JST)
+### Ver 2.2.3 (2026/10/16 20:20 JST)
 * Add fabicon.
 * Adopt latest Typescript.
 * Change the timing and criteria for checking input values.
 * Improved UX.
+* add following key function(space: start/stop, ⇦/⇨: change the stage of session)
 
 ### Ver 2.2.0 (2026/6/19 22:43 JST)
 
