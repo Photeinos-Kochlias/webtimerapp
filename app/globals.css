@@ -537,6 +537,16 @@ body::before {
   border-color: var(--accent);
 }
 
+.ps-cell input[aria-invalid="true"] {
+  border-color: var(--red);
+}
+
+.input-error {
+  color: var(--red);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .ps-cell.full {
   grid-column: 1 / -1;
 }
