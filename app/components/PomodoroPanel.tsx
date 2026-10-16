@@ -28,10 +28,11 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
   const [sets, setSets] = useState(4)
 
   // form inputs (before apply)
-  const [wInput, setWInput] = useState(25)
-  const [sInput, setSInput] = useState(5)
-  const [lInput, setLInput] = useState(15)
-  const [nInput, setNInput] = useState(4)
+  const [wInput, setWInput] = useState('25')
+  const [sInput, setSInput] = useState('5')
+  const [lInput, setLInput] = useState('15')
+  const [nInput, setNInput] = useState('4')
+  const [inputErrors, setInputErrors] = useState<Record<string, string>>({})
 
   const [cur, setCur] = useState(0)
   const [phase, setPhase] = useState<Phase>('work')
@@ -41,6 +42,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
   const [started, setStarted] = useState(false)
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const endAtRef = useRef<number | null>(null)
   const stateRef = useRef({ cur, phase, left, total, running, workMin, shortMin, longMin, sets })
   stateRef.current = { cur, phase, left, total, running, workMin, shortMin, longMin, sets }
 
@@ -79,6 +81,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
       onBeep('finish')
       onToast('🎉 全セット完了！お疲れさまでした！', '#4fc4a0')
       // reset
+      endAtRef.current = null
       setCur(0); setPhase('work')
       const t = w * 60; setTotal(t); setLeft(t)
       setRunning(false)
@@ -98,6 +101,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
 
     if (autoStart) {
       setRunning(true)
+      endAtRef.current = Date.now() + t * 1000
       intervalRef.current = setInterval(() => {
         setLeft(prev => {
           if (prev <= 1) {
@@ -124,6 +128,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
     setLeft(prev => {
       if (prev <= 1) {
         stop()
+        endAtRef.current = null
         const st = stateRef.current
         if (st.phase === 'work') {
             onBeep('done'); onToast('⏰ 作業終了！休憩へ移ります', '#7c6bff')
@@ -142,18 +147,20 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
 
   const toggle = useCallback(() => {
     if (running) {
-      stop(); setRunning(false)
-      savePomo({ running: false })
+      stop(); setRunning(false); endAtRef.current = null
+      savePomo({ running: false, endTs: null })
     } else {
       setRunning(true)
       setStarted(true)
-      savePomo({ running: true, endTs: Date.now() + left * 1000 })
+      endAtRef.current = Date.now() + left * 1000
+      savePomo({ running: true, endTs: endAtRef.current })
       intervalRef.current = setInterval(tick, 1000)
     }
   }, [running, stop, tick])
 
   const skip = useCallback(() => {
     stop()
+    endAtRef.current = null
     const st = stateRef.current
     if (st.phase === 'work') onBeep('done'); else onBeep('break')
     nextPhase(st.cur, st.phase, st.running, st.workMin, st.shortMin, st.longMin, st.sets)
@@ -161,26 +168,60 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
 
   const reset = useCallback(() => {
     stop(); setRunning(false); setStarted(false)
+    endAtRef.current = null
     setCur(0); setPhase('work')
     const t = workMin * 60; setTotal(t); setLeft(t)
     savePomo({ running: false, left: t, total: t, cur: 0, phase: 'work' })
   }, [stop, workMin])
 
+  const validateInput = useCallback((key: string, value: string, min: number, max: number) => {
+    const number = Number(value)
+    const error = /^\d+$/.test(value) && number >= min && number <= max
+      ? ''
+      : `${min}〜${max}の整数を入力してください`
+    setInputErrors(prev => ({ ...prev, [key]: error }))
+    return !error
+  }, [])
+
   const apply = useCallback(() => {
+    const valid = [
+      validateInput('work', wInput, 1, 60),
+      validateInput('short', sInput, 1, 30),
+      validateInput('long', lInput, 1, 60),
+      validateInput('sets', nInput, 1, 10),
+    ].every(Boolean)
+    if (!valid) return
+
+    const work = Number(wInput)
+    const short = Number(sInput)
+    const long = Number(lInput)
+    const setCount = Number(nInput)
     stop(); setRunning(false); setStarted(false)
-    setWorkMin(wInput); setShortMin(sInput); setLongMin(lInput); setSets(nInput)
+    endAtRef.current = null
+    setWorkMin(work); setShortMin(short); setLongMin(long); setSets(setCount)
     setCur(0); setPhase('work')
-    const t = wInput * 60; setTotal(t); setLeft(t)
+    const t = work * 60; setTotal(t); setLeft(t)
     savePomo({ running: false, left: t, total: t, cur: 0, phase: 'work' })
-  }, [stop, wInput, sInput, lInput, nInput])
+  }, [stop, wInput, sInput, lInput, nInput, validateInput])
 
   useWakeLock(running)
 
   useEffect(() => () => stop(), [stop])
 
   useEffect(() => {
-    const saveNow = () => savePomo()
-    const onVisibility = () => { if (document.hidden) saveNow() }
+    const saveNow = () => savePomo({ endTs: running ? endAtRef.current : null })
+    const onVisibility = () => {
+      if (document.hidden) {
+        saveNow()
+      } else if (running && endAtRef.current) {
+        const remaining = Math.ceil((endAtRef.current - Date.now()) / 1000)
+        if (remaining > 0) setLeft(remaining)
+        else {
+          setLeft(1)
+          window.setTimeout(tick, 0)
+        }
+      }
+    }
     window.addEventListener('pagehide', saveNow)
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('beforeunload', saveNow)
@@ -189,7 +230,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
       document.removeEventListener('visibilitychange', onVisibility)
       window.removeEventListener('beforeunload', saveNow)
     }
-  }, [savePomo])
+  }, [savePomo, running, tick])
 
   useEffect(() => {
     const st = loadState<any>('pomo')
@@ -202,9 +243,12 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
     if (st.running && st.endTs) {
       // time passed since save
       const elapsed = Math.max(0, Math.floor((Date.now() - (st.ts ?? Date.now())) / 1000))
-      let remaining = (st.left ?? 0) - elapsed
+      let remaining = st.endTs
+        ? Math.ceil((st.endTs - Date.now()) / 1000)
+        : (st.left ?? 0) - elapsed
 
       if (remaining > 0) {
+        endAtRef.current = st.endTs ?? Date.now() + remaining * 1000
         setCur(curVal)
         setPhase(phaseVal)
         setLeft(remaining)
@@ -230,6 +274,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
         const res = advanceOnce(curVal)
         if (res.finished) {
           // all sets completed
+          endAtRef.current = null
           setCur(0); setPhase('work')
           const t = workMin * 60; setTotal(t); setLeft(t)
           setRunning(false); setStarted(false)
@@ -237,6 +282,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
         }
         if (overflow < res.dur) {
           // we're inside this phase
+          endAtRef.current = Date.now() + (res.dur - overflow) * 1000
           setCur(res.nextCur)
           setPhase(res.nextPhase)
           setTotal(res.dur)
@@ -251,6 +297,7 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
         curVal = res.nextCur
       }
     } else {
+      endAtRef.current = null
       setCur(st.cur ?? 0)
       setPhase(st.phase ?? 'work')
       setLeft(st.left ?? left)
@@ -330,23 +377,31 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
       <div className="pomo-settings">
         <div className="ps-cell">
           <label>作業（分）</label>
-          <input type="number" min={1} max={60} value={wInput}
-            onChange={e => setWInput(parseInt(e.target.value) || 25)} />
+          <input type="number" min={1} max={60} value={wInput} aria-invalid={!!inputErrors.work}
+            onChange={e => { setWInput(e.target.value); setInputErrors(prev => ({ ...prev, work: '' })) }}
+            onBlur={e => validateInput('work', e.target.value, 1, 60)} />
+          {inputErrors.work && <span className="input-error" role="alert">{inputErrors.work}</span>}
         </div>
         <div className="ps-cell">
           <label>短い休憩（分）</label>
-          <input type="number" min={1} max={30} value={sInput}
-            onChange={e => setSInput(parseInt(e.target.value) || 5)} />
+          <input type="number" min={1} max={30} value={sInput} aria-invalid={!!inputErrors.short}
+            onChange={e => { setSInput(e.target.value); setInputErrors(prev => ({ ...prev, short: '' })) }}
+            onBlur={e => validateInput('short', e.target.value, 1, 30)} />
+          {inputErrors.short && <span className="input-error" role="alert">{inputErrors.short}</span>}
         </div>
         <div className="ps-cell">
           <label>長い休憩（分）</label>
-          <input type="number" min={1} max={60} value={lInput}
-            onChange={e => setLInput(parseInt(e.target.value) || 15)} />
+          <input type="number" min={1} max={60} value={lInput} aria-invalid={!!inputErrors.long}
+            onChange={e => { setLInput(e.target.value); setInputErrors(prev => ({ ...prev, long: '' })) }}
+            onBlur={e => validateInput('long', e.target.value, 1, 60)} />
+          {inputErrors.long && <span className="input-error" role="alert">{inputErrors.long}</span>}
         </div>
         <div className="ps-cell">
           <label>セット数</label>
-          <input type="number" min={1} max={10} value={nInput}
-            onChange={e => setNInput(parseInt(e.target.value) || 4)} />
+          <input type="number" min={1} max={10} value={nInput} aria-invalid={!!inputErrors.sets}
+            onChange={e => { setNInput(e.target.value); setInputErrors(prev => ({ ...prev, sets: '' })) }}
+            onBlur={e => validateInput('sets', e.target.value, 1, 10)} />
+          {inputErrors.sets && <span className="input-error" role="alert">{inputErrors.sets}</span>}
         </div>
         <div className="ps-cell full">
           <div className="apply-row">
@@ -371,16 +426,18 @@ export default function PomodoroPanel({ onBeep, onToast }: Props) {
           const lo = config.longMin ?? 15
           const s = config.sets ?? 4
           stop()
+          endAtRef.current = null
           setRunning(false)
           setStarted(false)
           setWorkMin(w)
           setShortMin(sh)
           setLongMin(lo)
           setSets(s)
-          setWInput(w)
-          setSInput(sh)
-          setLInput(lo)
-          setNInput(s)
+          setWInput(String(w))
+          setSInput(String(sh))
+          setLInput(String(lo))
+          setNInput(String(s))
+          setInputErrors({})
           setCur(0)
           setPhase('work')
           const t = w * 60

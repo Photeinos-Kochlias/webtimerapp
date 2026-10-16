@@ -22,6 +22,12 @@ export default function Home() {
     return () => document.removeEventListener('touchstart', handler)
   }, [resume])
 
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || (navigator as Navigator & { standalone?: boolean }).standalone === true
+    if (isStandalone && window.matchMedia('(min-width: 700px)').matches) setTab('pomo')
+  }, [])
+
   return (
     <>
       <Toast {...toastState} />
